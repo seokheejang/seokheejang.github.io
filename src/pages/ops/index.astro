@@ -1,0 +1,43 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Breadcrumb from "@/components/Breadcrumb.astro";
+import Main from "@/components/Main.astro";
+import Card from "@/components/Card.astro";
+import Footer from "@/components/Footer.astro";
+import { getSortedPosts } from "@/utils/getSortedPosts";
+import config from "@/config";
+
+const CLUSTER = "ops";
+
+const posts = await getCollection(
+  "posts",
+  ({ data, id }) => !data.draft && id.startsWith(`${CLUSTER}/`)
+);
+const sortedPosts = getSortedPosts(posts);
+---
+
+<Layout title={`Ops | ${config.site.title}`}>
+  <Header />
+
+  <Breadcrumb />
+
+  <Main pageTitle="Ops" pageDesc="DevOps · Infra · GitOps notes.">
+    {
+      sortedPosts.length === 0 ? (
+        <p class="text-muted-foreground my-8 italic">
+          아직 발행된 글이 없습니다.
+        </p>
+      ) : (
+        <ul>
+          {sortedPosts.map(post => (
+            <Card {...post} />
+          ))}
+        </ul>
+      )
+    }
+  </Main>
+
+  <Footer />
+</Layout>

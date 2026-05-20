@@ -1,126 +1,17 @@
 ---
-title: "개인 블로그를 처음 셋업하면서 — AstroPaper + GitHub Pages 회고"
+title: "hello"
 pubDatetime: 2026-05-20T20:00:00+09:00
-description: "AstroPaper로 첫 개인 블로그를 세팅하면서 만난 몇 가지 함정과, 콘텐츠 아키텍처를 어떻게 잡았는지에 대한 회고."
-tags: ["claude-code", "automation"]
-draft: true
+description: "test."
+tags: []
+draft: false
 ---
 
-## TL;DR
-
-- AstroPaper 템플릿으로 첫 개인 블로그를 세팅했다.
-- GitHub Pages + GitHub Actions로 무료 배포 (`https://seokheejang.github.io/`).
-- 가장 빡쳤던 함정: `node_modules/.astro/data-store.json` 에 박혀있던 stale content cache. `.astro/` 만 지워서는 안 사라진다.
-- 콘텐츠 아키텍처는 3 클러스터 (`ops` / `chain` / `lab`) + ~25개 controlled tag vocabulary + "폴더=시리즈" 패턴으로 잡았다.
-
-## Context
-
-오랫동안 개인 블로그 운영을 미뤄왔다. 시간이 부족해서가 아니라 — "어디에 쓸까", "어떤 톤으로 쓸까", "남이 본다는 부담을 어떻게 다룰까" 같은 결정 트리가 너무 길었다.
-
-오늘은 더 미루지 말고 한 세션 안에 셋업과 콘텐츠 아키텍처를 같이 결정해버리기로 했다. AI agent 와 같이 grill-me 형식으로 결정 트리를 빠르게 돌면서, 그 흐름대로 코드를 친 결과가 이 블로그고 이 글이다.
-
-## 셋업 과정 (요약)
-
-1. **AstroPaper 템플릿 fork** — GitHub "Use this template" 으로 `seokheejang.github.io` 레포 생성
-2. **로컬 clone + `pnpm install`** — Node 22 / pnpm 10.33.1
-3. **`astro-paper.config.ts` 본인 정보로 수정** — `site.url`, `title`, `author`, `socials`, `timezone` (Asia/Seoul)
-4. **Favicon → 🐳 이모지 SVG** — SVG `<text>` 안에 이모지 넣는 한 줄 트릭
-5. **GitHub Actions 배포 워크플로우 추가** — `actions/deploy-pages@v4` 사용
-6. **GitHub repo Settings → Pages → "GitHub Actions"** (한 번만)
-7. **푸시 → 자동 배포 확인**
-
-여기까지는 공식 가이드대로 따라가면 큰 트러블 없다. 진짜 함정은 그 다음에 왔다.
-
-## 함정 — `node_modules/.astro/data-store.json`
-
-샘플 포스트들을 다 지운 뒤 빌드가 계속 깨졌다.
-
-```
-[ImageNotFound] Could not find requested image `assets/AstroPaper-v6.png`
-```
-
-이상하다. 그 이미지를 참조하던 포스트는 이미 지웠는데?
-
-`.astro/` 캐시 폴더를 지우고 다시 빌드해도 같은 에러. `src/` 어디에도 그 이미지를 참조하는 코드는 없음.
-
-```bash
-find . -name "data-store*" -not -path "*/node_modules/*"
-# (아무것도 안 나옴)
-```
-
-그런데 `node_modules` 까지 포함해서 뒤지니까:
-
-```bash
-find . -name "data-store*"
-# ./node_modules/.astro/data-store.json
-```
-
-여기 있었다. **Astro 6는 content collection 의 persistent 메타데이터를 `node_modules/.astro/data-store.json` 에 캐싱한다.** `.astro/` 만 지우면 부족하고, 이 파일도 같이 정리해야 stale 참조가 사라진다.
-
-해결:
-
-```bash
-mv node_modules/.astro/data-store.json node_modules/.astro/data-store.json.bak
-pnpm run build  # 통과
-```
-
-새 Astro 프로젝트에서 sample content 를 대량 삭제할 때 마주칠 수 있는 함정. `.astro/` + `dist/` + `node_modules/.astro/data-store.json` 세트로 같이 정리해야 한다.
-
-## 콘텐츠 아키텍처
-
-블로그 구조는 grill-me 형식으로 한 가지씩 풀어서 결정했다. 각 결정은 다음 결정에 영향을 주기 때문에 순서가 중요했다.
-
-| 결정 | 답 |
-|---|---|
-| Primary audience | 미래의 나 + 동료 엔지니어 (채용은 부산물) |
-| 언어 | 한국어 우선, 영어는 선별 번역 |
-| Topic clusters | 3개: `ops` (DevOps/Infra) · `chain` (Blockchain Infra) · `lab` (Side project journals) |
-| 폴더 구조 | Cluster-first, `.en.md` suffix |
-| Tag 입도 | Mid · 3-4개/글 · controlled vocabulary (~25개) |
-| Series | Folder = series, `NN-` prefix |
-| 발행 주기 | Soft target — 월 2편 정도, 미달성 OK |
-
-### 클러스터를 3개로 좁힌 이유
-
-- **2개(ops + chain)** 는 깔끔하지만, 진행 중인 사이드 프로젝트 4개 (RPC IaC / IDC DNS / EKS Bootstrap / AI Paywall) 의 journal 글이 갈 곳이 없어진다.
-- **4개 이상** 으로 가면 (예: AI/Agent 를 별 클러스터로) 가로로 흐르는 thread 가 세로 클러스터에 잘못 박혀서 어색해진다.
-- **AI/Agent 는 클러스터가 아니라 태그**. 모든 클러스터에 걸쳐 등장하는 도구라서 가로 thread 가 자연스럽다.
-
-### Hard cadence 대신 Soft target 인 이유
-
-"주 1편 발행" 같은 hard commitment 박으면 cadence anxiety 가 즐거움을 죽인다. 즐거움이 죽으면 블로그가 죽는다. "한 달에 2편 정도" 같은 soft target 이면 미달성에 죄책감이 적고, 1년 이상 멘탈이 유지된다.
-
-## HTML artifact embed 테스트
-
-이 블로그를 만든 가장 큰 동기 중 하나는 **Claude 가 만든 HTML artifact 를 그대로 올리고 관리하는 것**이었다. 그 워크플로우를 첫 글에서 같이 시연한다.
-
-self-contained HTML 파일을 `public/artifacts/` 에 두면 그대로 정적 페이지로 서빙되고, `.mdx` 포스트에서 `<iframe>` 으로 embed 할 수 있다.
+블로그 시작. 테스트 겸 HTML embed 확인.
 
 <iframe
   src="/artifacts/2026-05-rpc-fleet-mock.html"
   width="100%"
   height="640"
-  style="border: 1px solid #1f2937; border-radius: 8px; margin: 1.5rem 0;"
-  title="Multi-chain RPC Fleet mock dashboard"
+  style="border: 1px solid #1f2937; border-radius: 8px;"
+  title="RPC fleet mock"
 />
-
-위 위젯은 [별도 페이지](/artifacts/2026-05-rpc-fleet-mock.html)에서 직접 열어볼 수도 있다. `Refresh` 누르면 mock 데이터가 새로 생성된다.
-
-이 패턴이면:
-- HTML 보존 (그대로 작동, Tailwind CDN 이나 JS 인터랙션 다 OK)
-- 블로그 컨텍스트 추가 (글로 설명)
-- 검색은 글 본문에서, 인터랙션은 artifact 에서
-
-## What I learned
-
-1. **Astro 6 의 캐시는 두 곳에 있다.** `.astro/` (project root) + `node_modules/.astro/data-store.json`. 양쪽 다 정리해야 stale 상태가 풀린다.
-2. **블로그 운영 결정 트리는 "한 번에" 풀어버리는 게 효율적이다.** 분산해서 고민하면 영원히 못 끝난다. AI agent 와 함께 결정 트리를 빠르게 도는 방식이 잘 먹혔다.
-3. **Cadence 는 soft target 이 답이다.** Hard 는 즐거움을 죽이고, 즐거움이 죽으면 블로그가 죽는다.
-
-## What's next
-
-- `lab/` 에 진행 중인 4 프로젝트의 journal 본격 시작
-- 이중언어 routing 구현 — 첫 영어 글 결심했을 때 같이 작업
-- About 페이지 narrative 와 stack 정확도 다듬기 (오늘 초안)
-
-오늘 작업 끝, 첫 글 발행.
