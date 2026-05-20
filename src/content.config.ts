@@ -5,6 +5,18 @@ import config from "@/config";
 
 export const BLOG_PATH = "src/content/posts";
 
+// ---------------------------------------------------------------------------
+// Controlled tag vocabulary (~25). New tags should be added here first.
+// Goal: prevent fragmentation (k8s vs kubernetes), keep tag pages meaningful.
+//
+//  K8s / container       : k8s · eks · helm · argocd · istio · cilium
+//  IaC / AWS / CI-CD     : terraform · aws · gitops · iac
+//  Blockchain infra      : blockchain · rpc-node · validator · idc
+//  Ops domains           : networking · observability · security · cost
+//  AI / Agent (thread)   : claude-code · ai-agent · automation
+//  Project journals      : project-rpc-iac · project-idc-dns · project-eks-bootstrap · project-paywall
+// ---------------------------------------------------------------------------
+
 const posts = defineCollection({
   loader: glob({ pattern: "**/[^_]*.{md,mdx}", base: `./${BLOG_PATH}` }),
   schema: ({ image }) =>
